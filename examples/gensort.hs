@@ -1,11 +1,15 @@
 {- An example of a genetic sorting algorithm
    contributed by Jøhannes Lippmann <code@schauderbasis.de> -}
-import Moo.GeneticAlgorithm.Binary
+
+#!/bin/bash
+
+module Main where
 
 import Control.Arrow (first)
 import Control.Monad (when)
 import Data.List (intercalate, sortBy)
 import Data.Ord (comparing)
+import Moo.GeneticAlgorithm.Binary
 
 {-
 Sorting a list (of Characters) using a genetic algorythm.
@@ -23,7 +27,7 @@ plot 'output.txt' using 1:2 with lines lc rgb 'red' lw 4 title 'best value',\
 
 ...and this in "gensort.sh"...
 
-#!/bin/bash
+
 ghc --make gensort.hs
 time ./gensort > gensort.txt
 gnuplot -p gensort.gnuplot
@@ -36,6 +40,7 @@ tail -5 gensort.txt
 
 -- list to be sorted
 type Problem a = [a]
+
 -- The Symetric Group of degree n: http://en.wikipedia.org/wiki/Symmetric_group
 -- a memeber of S_n should change the order of the elements, not the elements itself
 type S_n a = [a] -> [a]
@@ -43,28 +48,29 @@ type S_n a = [a] -> [a]
 -- sortingFittnes ls == 1 is aquivalent to ls == sort ls
 sortingFittness :: (Ord a) => Problem a -> Genome Bool -> Double
 sortingFittness problem bools =
-      (fromIntegral . sortcount . makeFunktion problem bools) problem
-      / (fromIntegral . twoOutOf . length) problem
+  (fromIntegral . sortcount . makeFunktion problem bools) problem
+    / (fromIntegral . twoOutOf . length) problem
   where
     sortcount :: (Ord a) => [a] -> Int
-    sortcount (x:xs) = (sum . map (sortcount' x)) xs + sortcount xs
+    sortcount (x : xs) = (sum . map (sortcount' x)) xs + sortcount xs
       where
         sortcount' :: (Ord a) => a -> a -> Int
         sortcount' x y
-          | x > y   = 0
+          | x > y = 0
           | otherwise = 1
-        --sortcount' x y = (length . filter id . (\x -> [x])) (x <= y)
+    --sortcount' x y = (length . filter id . (\x -> [x])) (x <= y)
     sortcount [] = 0
-
     twoOutOf :: Int -> Int
     twoOutOf 1 = 0
-    twoOutOf n = n - 1 + twoOutOf (n-1)
-
+    twoOutOf n = n - 1 + twoOutOf (n -1)
 
 problem = concat $ replicate 1 "fNortOfe"
+
 genomesize = boolGenomeLengthForProblem problem
+
 -- stopconditions (they are very high)
 maxiters = 50000
+
 timeLimit = 60 -- 1 minute
 
 popsize :: Int
@@ -82,49 +88,56 @@ mutation = pointMutate 0.5
 elitesize = 1
 
 showGenome :: (Ord a, Show a) => Problem a -> Genome Bool -> String
-showGenome problem bools = "Genome " ++ showBits bools
-            ++ "\n(which eqals to " ++ (show . boolGenomeToIntGenome (length problem)) bools ++ ")"
-            ++ "\nmakes " ++ show problem
-            ++ "\nto " ++ (show . makeFunktion problem bools) problem
-            ++ "\n(Sortingfittness: " ++ show (sortingFittness problem bools) ++ ")"
-            where
-              showBits :: [Bool] -> String
-              showBits = concatMap (show . fromEnum)
+showGenome problem bools =
+  "Genome " ++ showBits bools
+    ++ "\n(which eqals to "
+    ++ (show . boolGenomeToIntGenome (length problem)) bools
+    ++ ")"
+    ++ "\nmakes "
+    ++ show problem
+    ++ "\nto "
+    ++ (show . makeFunktion problem bools) problem
+    ++ "\n(Sortingfittness: "
+    ++ show (sortingFittness problem bools)
+    ++ ")"
+  where
+    showBits :: [Bool] -> String
+    showBits = concatMap (show . fromEnum)
 
 geneticAlgorithm :: (Ord a, Show a) => Problem a -> IO (Population Bool)
 geneticAlgorithm problem = do
   let fitness = sortingFittness problem
   let nextGen = nextGeneration Maximizing fitness selection elitesize crossover mutation
-  runIO initializeBoolGenome $ loopIO
-    [DoEvery 1 (logStats problem), TimeLimit timeLimit]
-    (Or (Generations maxiters) (IfObjective (any (==1))))
-    nextGen
+  runIO initializeBoolGenome $
+    loopIO
+      [DoEvery 1 (logStats problem), TimeLimit timeLimit]
+      (Or (Generations maxiters) (IfObjective (any (== 1))))
+      nextGen
 
 -- Gnuplotreadable statistics for 1 Generation
 logStats :: (Ord a, Show a) => Problem a -> Int -> Population Bool -> IO ()
 logStats problem iterno pop = do
   when (iterno == 0) $
     putStrLn "# generation medianValue bestValue"
-  let gs = map takeGenome . bestFirst Maximizing $ pop  -- genomes
+  let gs = map takeGenome . bestFirst Maximizing $ pop -- genomes
   let best = head gs
   let median = gs !! (length gs `div` 2)
   let worst = last gs
-  putStrLn $ unwords  [ show iterno
-            , (take 6 . show . sortingFittness problem) best
-            , (take 6 . show . sortingFittness problem) median
-            , (take 6 . show . sortingFittness problem) worst
-            , show ((makeFunktion problem best) problem)
-            ]
+  putStrLn $
+    unwords
+      [ show iterno,
+        (take 6 . show . sortingFittness problem) best,
+        (take 6 . show . sortingFittness problem) median,
+        (take 6 . show . sortingFittness problem) worst,
+        show ((makeFunktion problem best) problem)
+      ]
 
-main :: IO()
+main :: IO ()
 main = do
   finalPop <- geneticAlgorithm problem
   let winner = takeGenome . head . bestFirst Maximizing $ finalPop
   putStrLn $ showGenome problem winner
   return ()
-
-
-
 
 -- Dealing with Genomes
 
@@ -135,7 +148,7 @@ initializeBoolGenome = getRandomBinaryGenomes popsize genomesize
 -- in which range are the numbers that are sorted to generate the S_n
 -- the bigger d the more permutations are evaluated, so they are more equaly distributed
 intRange :: Int -> (Int, Int)
-intRange n = (0,d*n)
+intRange n = (0, d * n)
   where
     d = 10
 
@@ -159,7 +172,7 @@ makeFunktion problem boolGenome
 
 boolGenomeToIntGenome :: Int -> [Bool] -> [Int]
 boolGenomeToIntGenome problemLength boolGenome
-  | length boolGenome `mod`  boolsPerInt problemLength /= 0 = error "Problem Converting [Bool] -> [Int] "
+  | length boolGenome `mod` boolsPerInt problemLength /= 0 = error "Problem Converting [Bool] -> [Int] "
   | otherwise = map (decodeGray (intRange problemLength)) (splitEvery (boolsPerInt problemLength) boolGenome)
 
 intGenomeToS_n :: (Ord a) => [a] -> S_n b

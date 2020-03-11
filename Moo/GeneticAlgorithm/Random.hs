@@ -1,37 +1,49 @@
-{- | Some extra facilities to work with 'Rand' monad and 'PureMT'
-     random number generator.
--}
-
+-- | Some extra facilities to work with 'Rand' monad and 'PureMT'
+--     random number generator.
 module Moo.GeneticAlgorithm.Random
-    (
-    -- * Random numbers from given range
-      getRandomR
-    , getRandom
+  ( -- * Random numbers from given range
+    getRandomR,
+    getRandom,
+
     -- * Probability distributions
-    , getNormal2
-    , getNormal
+    getNormal2,
+    getNormal,
+
     -- * Random samples and shuffles
-    , randomSample
-    , randomSampleIndices
-    , shuffle
+    randomSample,
+    randomSampleIndices,
+    shuffle,
+
     -- * Building blocks
-    , withProbability
+    withProbability,
+
     -- * Re-exports from random number generator packages
-    , getBool, getInt, getWord, getInt64, getWord64, getDouble
-    , runRand, evalRand, newPureMT, liftRand
-    , Rand, Random, PureMT
-    ) where
+    getBool,
+    getInt,
+    getWord,
+    getInt64,
+    getWord64,
+    getDouble,
+    runRand,
+    evalRand,
+    newPureMT,
+    liftRand,
+    Rand,
+    Random,
+    PureMT,
+  )
+where
 
 import Control.Monad (liftM)
 import qualified Control.Monad.Random.Strict as MonadRandom
-import Control.Monad.Random.Strict (liftRand, runRand, evalRand)
+import Control.Monad.Random.Strict (evalRand, liftRand, runRand)
 import Data.Complex (Complex (..))
 import Data.Int (Int64)
+import qualified Data.Set as Set
 import Data.Word (Word64)
-import System.Random (RandomGen, Random(..))
+import System.Random (Random (..), RandomGen)
 import System.Random.Mersenne.Pure64
 import qualified System.Random.Shuffle as S
-import qualified Data.Set as Set
 
 type Rand = MonadRandom.Rand PureMT
 
@@ -47,14 +59,19 @@ getRandom = liftRand random
 
 getBool :: Rand Bool
 getBool = getRandom
+
 getDouble :: Rand Double
 getDouble = getRandom
+
 getWord :: Rand Word
 getWord = getRandom
+
 getInt :: Rand Int
 getInt = getRandom
+
 getInt64 :: Rand Int64
 getInt64 = getRandom
+
 getWord64 :: Rand Word64
 getWord64 = getRandom
 
@@ -65,9 +82,9 @@ getNormal2 = do
   -- Box-Muller method
   u <- getDouble
   v <- getDouble
-  let (c :+ s) = exp (0 :+ (2*pi*v))
+  let (c :+ s) = exp (0 :+ (2 * pi * v))
   let r = sqrt $ (-2) * log u
-  return (r*c, r*s)
+  return (r * c, r * s)
 
 -- | Yield one randomly selected value from standard normal distribution.
 getNormal :: Rand Double
@@ -80,27 +97,27 @@ randomSample n xs =
   where
     select rng _ _ [] acc = (reverse acc, rng)
     select rng n m xs acc
-        | n <= 0     = (reverse acc, rng)
-        | otherwise  =
-            let (k, rng') = randomR (0, m - n) rng
-                (x:rest) = drop k xs
-            in  select rng' (n-1) (m-k-1) rest (x:acc)
+      | n <= 0 = (reverse acc, rng)
+      | otherwise =
+        let (k, rng') = randomR (0, m - n) rng
+            (x : rest) = drop k xs
+         in select rng' (n -1) (m - k -1) rest (x : acc)
 
 -- | Select @sampleSize@ numbers in the range from @0@ to @(populationSize-1)@.
 -- The function works best when @sampleSize@ is much smaller than @populationSize@.
 randomSampleIndices :: Int -> Int -> Rand [Int]
 randomSampleIndices sampleSize populationSize =
-    liftRand $ \g ->
-        let (sampleSet, g') = buildSampleSet g sampleSize Set.empty
-        in  (Set.toList sampleSet, g')
+  liftRand $ \g ->
+    let (sampleSet, g') = buildSampleSet g sampleSize Set.empty
+     in (Set.toList sampleSet, g')
   where
     buildSampleSet g n s
-        | n <= 0 = (s, g)
-        | otherwise =
-            let (i, g') = randomR (0, populationSize-1) g
-            in  if (i `Set.member` s)
-                then buildSampleSet g' n s
-                else buildSampleSet g' (n-1) (Set.insert i s)
+      | n <= 0 = (s, g)
+      | otherwise =
+        let (i, g') = randomR (0, populationSize -1) g
+         in if (i `Set.member` s)
+              then buildSampleSet g' n s
+              else buildSampleSet g' (n -1) (Set.insert i s)
 
 -- | Randomly reorder the list.
 shuffle :: [a] -> Rand [a]
@@ -112,32 +129,30 @@ shuffle xs = liftRand $ \g -> randomShuffle xs (length xs) g
 -- random generator.
 randomShuffle :: RandomGen gen => [a] -> Int -> gen -> ([a], gen)
 randomShuffle elements len g =
-    let (rs, g') = rseq len g
-    in  (S.shuffle elements rs, g')
+  let (rs, g') = rseq len g
+   in (S.shuffle elements rs, g')
   where
-  -- | The sequence (r1,...r[n-1]) of numbers such that r[i] is an
-  -- independent sample from a uniform random distribution
-  -- [0..n-i]
-  rseq :: RandomGen gen => Int -> gen -> ([Int], gen)
-  rseq n g = second lastGen . unzip $ rseq' (n - 1) g
+    rseq :: RandomGen gen => Int -> gen -> ([Int], gen)
+    rseq n g = second lastGen . unzip $ rseq' (n - 1) g
       where
         rseq' :: RandomGen gen => Int -> gen -> [(Int, gen)]
         rseq' i gen
-          | i <= 0    = []
-          | otherwise = let (j, gen') = randomR (0, i) gen
-                        in  (j, gen') : rseq' (i - 1) gen'
+          | i <= 0 = []
+          | otherwise =
+            let (j, gen') = randomR (0, i) gen
+             in (j, gen') : rseq' (i - 1) gen'
         -- apply a function on the second element of a pair
         second :: (b -> c) -> (a, b) -> (a, c)
-        second f (x,y) = (x, f y)
+        second f (x, y) = (x, f y)
         -- the last returned random number generator
-        lastGen [] = g   -- didn't use the generator yet
-        lastGen (lst:[]) = lst
+        lastGen [] = g -- didn't use the generator yet
+        lastGen (lst : []) = lst
         lastGen gens = lastGen (drop 1 gens)
 
--- |Modify value with probability @p@. Return the unchanged value with probability @1-p@.
+-- | Modify value with probability @p@. Return the unchanged value with probability @1-p@.
 withProbability :: Double -> (a -> Rand a) -> (a -> Rand a)
 withProbability p modify x = do
   t <- getDouble
   if t < p
-     then modify x
-     else return x
+    then modify x
+    else return x

@@ -14,42 +14,49 @@ N=100 ; ghc --make cp_himmelblau && ./cp_himmelblau -b -d -g $N > output.txt && 
 
 
 -}
-
-
-import Moo.GeneticAlgorithm.Continuous
-import Moo.GeneticAlgorithm.Constraints
-
-
-import ExampleMain
-
+module Main where
 
 import Data.Function (on)
-
+import ExampleMain
+import Moo.GeneticAlgorithm.Constraints
+import Moo.GeneticAlgorithm.Continuous
 
 f :: [Double] -> Double
-f [x, y] = (x**2 + y - 11)**2 + (x + y**2 - 7)**2
-xvar [x,_] = x
-yvar [_,y] = y
-g1 [x,y] = 4.84 - (x-0.05)**2 - (y-2.5)**2
-g2 [x,y] = x**2 + (y-2.5)**2 - 4.84
+f [x, y] = (x ** 2 + y - 11) ** 2 + (x + y ** 2 - 7) ** 2
 
+xvar [x, _] = x
 
-constraints = [ 0 .<= xvar <=. 6
-              , 0 .<= yvar <=. 6
-              , g1 .>=. 0
-              , g2 .>=. 0 ]
+yvar [_, y] = y
 
+g1 [x, y] = 4.84 - (x -0.05) ** 2 - (y -2.5) ** 2
+
+g2 [x, y] = x ** 2 + (y -2.5) ** 2 - 4.84
+
+constraints =
+  [ 0 .<= xvar <=. 6,
+    0 .<= yvar <=. 6,
+    g1 .>=. 0,
+    g2 .>=. 0
+  ]
 
 popsize = 100
-initialize = getRandomGenomes popsize [(0,6),(0,6)]
-select = withFitnessSharing (distance2 `on` takeGenome) 0.025 1 Minimizing $
-         withConstraints constraints (degreeOfViolation 1.0 0.0) Minimizing $
-         tournamentSelect Minimizing 2 popsize
-step = withFinalDeathPenalty constraints $
-       nextGeneration Minimizing f select 0
-       (simulatedBinaryCrossover 0.5)
-       (gaussianMutate 0.05 0.025)
 
+initialize = getRandomGenomes popsize [(0, 6), (0, 6)]
+
+select =
+  withFitnessSharing (distance2 `on` takeGenome) 0.025 1 Minimizing
+    $ withConstraints constraints (degreeOfViolation 1.0 0.0) Minimizing
+    $ tournamentSelect Minimizing 2 popsize
+
+step =
+  withFinalDeathPenalty constraints $
+    nextGeneration
+      Minimizing
+      f
+      select
+      0
+      (simulatedBinaryCrossover 0.5)
+      (gaussianMutate 0.05 0.025)
 
 {-
 -- exampleMain takes care of command line options and pretty printing.
@@ -60,5 +67,9 @@ main = do
   print . head . bestFirst Minimizing $ results
 
 -}
-main = exampleMain (exampleDefaults { numGenerations = 100 } )
-       Minimizing initialize step
+main =
+  exampleMain
+    (exampleDefaults {numGenerations = 100})
+    Minimizing
+    initialize
+    step

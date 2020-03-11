@@ -1,47 +1,40 @@
-{- |
-
-Selection operators for genetic algorithms.
-
--}
-
+-- |
+--
+-- Selection operators for genetic algorithms.
 module Moo.GeneticAlgorithm.Selection
-  (
-    rouletteSelect
-  , stochasticUniversalSampling
-  , tournamentSelect
-  -- ** Scaling and niching
-  , withPopulationTransform
-  , withScale
-  , rankScale
-  , withFitnessSharing
-  -- ** Sorting
-  , bestFirst
-  ) where
+  ( rouletteSelect,
+    stochasticUniversalSampling,
+    tournamentSelect,
 
+    -- ** Scaling and niching
+    withPopulationTransform,
+    withScale,
+    rankScale,
+    withFitnessSharing,
 
-import Moo.GeneticAlgorithm.Types
-import Moo.GeneticAlgorithm.Random
-import Moo.GeneticAlgorithm.Niching (fitnessSharing)
+    -- ** Sorting
+    bestFirst,
+  )
+where
 
-
-import Control.Monad (liftM, replicateM)
 import Control.Arrow (second)
-import Data.List (sortBy)
+import Control.Monad (liftM, replicateM)
 import Data.Function (on)
+import Data.List (sortBy)
 import qualified Data.Vector as V
-
-
+import Moo.GeneticAlgorithm.Niching (fitnessSharing)
+import Moo.GeneticAlgorithm.Random
+import Moo.GeneticAlgorithm.Types
 
 -- | Apply given scaling or other transform to population before selection.
 withPopulationTransform :: (Population a -> Population a) -> SelectionOp a -> SelectionOp a
 withPopulationTransform transform select = \pop -> select (transform pop)
 
-
 -- | Transform objective function values before seletion.
 withScale :: (Objective -> Objective) -> SelectionOp a -> SelectionOp a
 withScale f select =
-    let scale = map (second f)
-    in  withPopulationTransform scale select
+  let scale = map (second f)
+   in withPopulationTransform scale select
 
 -- | Replace objective function values in the population with their
 -- ranks.  For a population of size @n@, a genome with the best value
@@ -53,17 +46,16 @@ withScale f select =
 -- function is not necessarily positive.
 rankScale :: ProblemType -> Population a -> Population a
 rankScale problem pop =
-    let sorted = bestFirst (opposite problem) pop  -- worst first
-        worst = takeObjectiveValue . head $ sorted
-    in  ranks 1 worst sorted
-    where
-      ranks _ _ [] = []
-      ranks rank worst ((genome,objective):rest)
-          | worst == objective  = (genome,rank)   : ranks rank worst rest
-          | otherwise           = (genome,rank+1) : ranks (rank+1) objective rest
-      opposite Minimizing = Maximizing
-      opposite Maximizing = Minimizing
-
+  let sorted = bestFirst (opposite problem) pop -- worst first
+      worst = takeObjectiveValue . head $ sorted
+   in ranks 1 worst sorted
+  where
+    ranks _ _ [] = []
+    ranks rank worst ((genome, objective) : rest)
+      | worst == objective = (genome, rank) : ranks rank worst rest
+      | otherwise = (genome, rank + 1) : ranks (rank + 1) objective rest
+    opposite Minimizing = Maximizing
+    opposite Maximizing = Minimizing
 
 -- | A popular niching method proposed by D. Goldberg and
 -- J. Richardson in 1987. The shared fitness of the individual is inversely
@@ -80,69 +72,78 @@ rankScale problem pop =
 -- Computation Conference (pp. 319-326). Morgan Kaufmann Publishers
 -- Inc..
 withFitnessSharing ::
-    (Phenotype a -> Phenotype a -> Double)  -- ^ distance function
-    -> Double  -- ^ niche radius
-    -> Double  -- ^ niche compression exponent @alpha@ (usually 1)
-    -> ProblemType   -- ^ type of the optimization problem
-    -> (SelectionOp a -> SelectionOp a)
+  -- | distance function
+  (Phenotype a -> Phenotype a -> Double) ->
+  -- | niche radius
+  Double ->
+  -- | niche compression exponent @alpha@ (usually 1)
+  Double ->
+  -- | type of the optimization problem
+  ProblemType ->
+  (SelectionOp a -> SelectionOp a)
 withFitnessSharing dist r alpha ptype =
-    withPopulationTransform (fitnessSharing dist r alpha ptype)
+  withPopulationTransform (fitnessSharing dist r alpha ptype)
 
-
--- |Objective-proportionate (roulette wheel) selection: select @n@
--- random items with each item's chance of being selected is
--- proportional to its objective function (fitness).
--- Objective function should be non-negative.
+-- | Objective-proportionate (roulette wheel) selection: select @n@
+--  random items with each item's chance of being selected is
+--  proportional to its objective function (fitness).
+--  Objective function should be non-negative.
 rouletteSelect :: Int -> SelectionOp a
 rouletteSelect n xs = replicateM n roulette1
   where
-  fs = map takeObjectiveValue xs
-  xs' = zip xs (scanl1 (+) fs)
-  sumScores = (snd . last) xs'
-  roulette1 = do
-    rand <- (sumScores*) `liftM` getDouble
-    return $ (fst . head . dropWhile ((rand >) . snd)) xs'
+    fs = map takeObjectiveValue xs
+    xs' = zip xs (scanl1 (+) fs)
+    sumScores = (snd . last) xs'
+    roulette1 = do
+      rand <- (sumScores *) `liftM` getDouble
+      return $ (fst . head . dropWhile ((rand >) . snd)) xs'
 
--- |Performs tournament selection among @size@ individuals and
--- returns the winner. Repeat @n@ times.
-tournamentSelect :: ProblemType  -- ^ type of the optimization problem
-                 -> Int -- ^ size of the tournament group
-                 -> Int -- ^ how many tournaments to run
-                 -> SelectionOp a
+-- | Performs tournament selection among @size@ individuals and
+--  returns the winner. Repeat @n@ times.
+tournamentSelect ::
+  -- | type of the optimization problem
+  ProblemType ->
+  -- | size of the tournament group
+  Int ->
+  -- | how many tournaments to run
+  Int ->
+  SelectionOp a
 tournamentSelect problem size n xs = do
-    let popvec = V.fromList xs
-    let popsize = V.length popvec
-    groups <- replicateM n $ randomSampleIndices size popsize
-    return $ map (tournament1 problem popvec) groups
+  let popvec = V.fromList xs
+  let popsize = V.length popvec
+  groups <- replicateM n $ randomSampleIndices size popsize
+  return $ map (tournament1 problem popvec) groups
   where
     tournament1 problem popvec group =
       let contestants = map (popvec V.!) group
           best = head $ bestFirst problem contestants
-      in  best
+       in best
 
 -- | Stochastic universal sampling (SUS) is a selection technique
 -- similar to roulette wheel selection. It gives weaker members a fair
 -- chance to be selected, which is proportinal to their
 -- fitness. Objective function should be non-negative.
-stochasticUniversalSampling :: Int  -- ^ how many genomes to select
-                            -> SelectionOp a
+stochasticUniversalSampling ::
+  -- | how many genomes to select
+  Int ->
+  SelectionOp a
 stochasticUniversalSampling n phenotypes = do
-    let total = sum . map takeObjectiveValue $ phenotypes
-    let step = total / (fromIntegral n)
-    start <- getRandomR (0, step)
-    let stops = [start + (fromIntegral i)*step | i <- [0..(n-1)]]
-    let cumsums = scanl1 (+) (map takeObjectiveValue phenotypes)
-    let ranges = zip (0:cumsums) cumsums
-    -- for every stop select a phenotype with left cumsum <= stop < right cumsum
-    return $ selectAtStops [] phenotypes stops ranges
+  let total = sum . map takeObjectiveValue $ phenotypes
+  let step = total / (fromIntegral n)
+  start <- getRandomR (0, step)
+  let stops = [start + (fromIntegral i) * step | i <- [0 .. (n -1)]]
+  let cumsums = scanl1 (+) (map takeObjectiveValue phenotypes)
+  let ranges = zip (0 : cumsums) cumsums
+  -- for every stop select a phenotype with left cumsum <= stop < right cumsum
+  return $ selectAtStops [] phenotypes stops ranges
   where
-    selectAtStops selected _ [] _ = selected  -- no more stop points
-    selectAtStops selected [] _ _ = selected  -- no more phenotypes
-    selectAtStops selected phenotypes@(x:xs) stops@(s:ss) ranges@((l,r):lrs)
-       | (l <= s && s < r) = selectAtStops (x:selected) phenotypes ss ranges  -- select a phenotype
-       | s >= r = selectAtStops selected xs stops lrs  -- skip a phenotype AND the range
-       | s < l  = error "stochasticUniformSampling: stop < leftSum"  -- should never happen
-    selectAtStops _ _ _ _ = error "stochasticUniversalSampling: unbalanced ranges?"  -- should never happen
+    selectAtStops selected _ [] _ = selected -- no more stop points
+    selectAtStops selected [] _ _ = selected -- no more phenotypes
+    selectAtStops selected phenotypes@(x : xs) stops@(s : ss) ranges@((l, r) : lrs)
+      | (l <= s && s < r) = selectAtStops (x : selected) phenotypes ss ranges -- select a phenotype
+      | s >= r = selectAtStops selected xs stops lrs -- skip a phenotype AND the range
+      | s < l = error "stochasticUniformSampling: stop < leftSum" -- should never happen
+    selectAtStops _ _ _ _ = error "stochasticUniversalSampling: unbalanced ranges?" -- should never happen
 
 -- | Sort population by decreasing objective function (also known as
 -- fitness for maximization problems). The genomes with the highest

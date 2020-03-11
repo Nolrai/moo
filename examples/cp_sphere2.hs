@@ -5,33 +5,30 @@
    with x + y >= 1.
 
 -}
-
-import Moo.GeneticAlgorithm.Continuous
-import Moo.GeneticAlgorithm.Constraints
-
+module Main where
 
 import ExampleMain
-
+import Moo.GeneticAlgorithm.Constraints
+import Moo.GeneticAlgorithm.Continuous
 
 f :: [Double] -> Double
-f [x, y] = x*x + y*y
+f [x, y] = x * x + y * y
 
-
-constraints = [ sum .>=. 1 ]
-
+constraints = [sum .>=. 1]
 
 popsize = 100
 
+initialize = getRandomGenomes popsize [(-10, 10), (-5, 5)]
 
-initialize = getRandomGenomes popsize [(-10,10),(-5,5)]
 select = tournamentSelect Minimizing 2 popsize
+
 crossover = unimodalCrossoverRP
+
 mutation = noMutation
 
-
-step = withDeathPenalty constraints $
-       nextGeneration Minimizing f select 2 crossover mutation
-
+step =
+  withDeathPenalty constraints $
+    nextGeneration Minimizing f select 2 crossover mutation
 
 {-
 -- exampleMain takes care of command line options and pretty printing.
@@ -42,5 +39,9 @@ main = do
   print . head . bestFirst Minimizing $ results
 
 -}
-main = exampleMain (exampleDefaults { numGenerations = 25 })
-       Minimizing initialize step
+main =
+  exampleMain
+    (exampleDefaults {numGenerations = 25})
+    Minimizing
+    initialize
+    step

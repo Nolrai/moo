@@ -14,48 +14,49 @@ big populations to find the solution (all ones).
 This example maximizes 4 concatenated 4-bit trap functions.
 
 -}
-
-
-import Moo.GeneticAlgorithm.Binary
-
+module Main where
 
 import Control.Arrow (first)
-
+import Moo.GeneticAlgorithm.Binary
 
 popsize = 320
-genomesize = 4*4
-maxiters = 10000
 
+genomesize = 4 * 4
+
+maxiters = 10000
 
 trapFunction :: [Bool] -> Double
 trapFunction bits =
-    let u = length . filter (id) $ bits
-        n = length bits
-    in  if u == n
+  let u = length . filter (id) $ bits
+      n = length bits
+   in if u == n
         then fromIntegral $ n
         else fromIntegral $ n - 1 - u
-
 
 fitness :: [Bool] -> Double
 fitness = sum . map trapFunction . split4
   where
     split4 [] = []
-    split4 xs = let (a,b) = splitAt 4 xs
-                in  a : split4 b
-
+    split4 xs =
+      let (a, b) = splitAt 4 xs
+       in a : split4 b
 
 initialize = getRandomBinaryGenomes popsize genomesize
+
 select = stochasticUniversalSampling popsize
+
 crossover = onePointCrossover 0.5
+
 mutate = pointMutate 0.01
-evolve = loop ((Generations maxiters) `Or` converged) $
-         nextGeneration Maximizing fitness select 0 crossover mutate
+
+evolve =
+  loop ((Generations maxiters) `Or` converged) $
+    nextGeneration Maximizing fitness select 0 crossover mutate
   where
     converged = IfObjective $ \fitvals -> maximum fitvals == minimum fitvals
 
-
 main = do
-    pop <- runGA initialize evolve
-    mapM_ (print . first showBits) (take 1 $ bestFirst Maximizing pop)
+  pop <- runGA initialize evolve
+  mapM_ (print . first showBits) (take 1 $ bestFirst Maximizing pop)
   where
     showBits = map (\b -> if b then '1' else '_')
